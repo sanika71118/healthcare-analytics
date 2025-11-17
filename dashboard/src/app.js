@@ -193,16 +193,16 @@ const HealthcareDashboard = () => {
     };
   }, [data]);
   
-  const handleQuery = async () => {
-    if (!input.trim()) return;
-    
-    const userMessage = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setLoading(true);
-    
-    try {
-      const context = `
+const handleQuery = async () => {
+  if (!input.trim()) return;
+  
+  const userMessage = { role: 'user', content: input };
+  setMessages(prev => [...prev, userMessage]);
+  setInput('');
+  setLoading(true);
+  
+  try {
+    const context = `
 Healthcare Analytics Context:
 - Total Patients: ${data.patients.length}
 - Total Visits: ${data.visits.length}
@@ -213,46 +213,52 @@ Healthcare Analytics Context:
 - High Risk Patients: ${analytics.highRiskPatients.length}
 - ML Model Accuracy: ${(analytics.modelMetrics.accuracy * 100).toFixed(1)}%
 `;
-      
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [
-            { 
-              role: "user", 
-              content: `You are a healthcare data analyst. Use this data:
-
-${context}
-
-User Question: ${userMessage.content}
-
-Provide a concise answer with specific numbers.`
-            }
-          ],
-        })
-      });
-      
-      const responseData = await response.json();
-      const assistantMessage = {
-        role: 'assistant',
-        content: responseData.content[0].text
-      };
-      
-      setMessages(prev => [...prev, assistantMessage]);
-    } catch (error) {
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.'
-      }]);
-    } finally {
-      setLoading(false);
+    
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: "You are a healthcare data analyst. Provide concise, data-driven answers."
+          },
+          { 
+            role: "user", 
+            content: `${context}\n\nUser Question: ${userMessage.content}`
+          }
+        ],
+        max_tokens: 1000,
+        temperature: 0.7
+      })
+    });
+    
+    const responseData = await response.json();
+    
+    if (responseData.error) {
+      throw new Error(responseData.error.message);
     }
-  };
+    
+    const assistantMessage = {
+      role: 'assistant',
+      content: responseData.choices[0].message.content
+    };
+    
+    setMessages(prev => [...prev, assistantMessage]);
+  } catch (error) {
+    console.error('API Error:', error);
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content: `Error: ${error.message}. Please check your API key.`
+    }]);
+  } finally {
+    setLoading(false);
+  }
+};
   
   if (dataLoading) {
     return (
